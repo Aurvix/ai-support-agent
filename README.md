@@ -28,6 +28,41 @@ Updates preserve existing settings and exclusions. **Deleting the plugin removes
 
 The disposable integration fixture pins WordPress7.1.4, WooCommerce11.2.2 and PHP8.1.34. This is evidence for that fixture, not a claim that every supported WordPress/PHP/theme combination has been tested. No Node.js dependency is required to install or run the plugin in WordPress.
 
+## Screenshots
+
+These are local UI previews of **v0.1.45**, using the shipped plugin assets and disposable WordPress demo markup. All accounts, product facts and conversations are fictional. The customer reply is simulated; no live model, customer or store connection was used. The previews show the Original/Light appearance; themes and branding are configurable.
+
+### Admin overview
+
+The support workspace brings provider status, knowledge counts and the customer-chat control together. This unconfigured demo intentionally has customer chat disabled.
+
+![AI Support Agent admin overview with navigation, status cards and customer-chat control](docs/screenshots/admin-overview.jpg)
+
+### Customer chat
+
+The floating widget includes quick actions, message bubbles, timestamps and a compact composer. This sample reply is for the interface preview only.
+
+![Customer support widget with a fictional product question and simulated assistant reply](docs/screenshots/customer-chat.jpg)
+
+<details>
+<summary>See the admin Chat Inbox and widget customization</summary>
+
+### Admin Chat Inbox
+
+The demo Inbox shows the conversation list, filters, human takeover controls and the website-reply composer. Account IDs and saved messages are synthetic test fixtures.
+
+![Admin Chat Inbox with synthetic conversations, takeover controls and a reply composer](docs/screenshots/admin-inbox.jpg)
+
+### Widget customization and live preview
+
+Branding controls and the unsaved widget preview appear side by side. The preview itself does not send messages or save settings.
+
+![Widget branding settings beside the local live appearance preview](docs/screenshots/widget-customization.jpg)
+
+</details>
+
+See [screenshot provenance](docs/screenshots/README.md) for how these documentation images were captured.
+
 ## Features
 
 - Provider-specific model names/IDs, manual overrides, official-provider endpoints and destination-bound encrypted credentials.
