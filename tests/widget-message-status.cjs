@@ -1,0 +1,48 @@
+const assert=require('node:assert/strict');
+const {fixture}=require('./widget-catalog.cjs');
+const pause=()=>new Promise(r=>setImmediate(r));
+let checks=0;const check=(ok,label)=>{checks++;assert(ok,label);};
+const receipts=f=>f.nodes().filter(n=>n.className==='message-delivery');
+(async()=>{
+ const f=fixture({chatMode:'pending'});await f.open();const flight=f.submit('Literal <img> हिंदी question');
+ while(!f.state.releaseChat)await pause();
+ check(receipts(f).at(-1).textContent==='Sending…','pending request has honest sending status');
+ check(!receipts(f).some(n=>n.textContent==='Sent'),'no premature receipt');
+ check(f.nodes().some(n=>n.className==='message-body'&&n.textContent==='Literal <img> हिंदी question'),'customer text is literal');
+ check(!f.nodes().some(n=>n.tag==='img'&&n.src?.includes('Literal')),'message markup never executes');
+ const time=f.nodes().find(n=>n.className==='message-time');check(time?.textContent&&time.attributes['aria-hidden']==='true','device time is visual only');
+ check(receipts(f).at(-1).attributes['aria-live']==='polite','sending changes announced politely');
+ f.state.releaseChat();await flight;check(receipts(f).at(-1).textContent==='Sent','valid answer confirms accepted turn');
+ f.state.chatMode='ok';await f.submit('Second explicit question');const payload=f.state.calls.filter(c=>c.name==='chat').at(-1).data;
+ check(Object.keys(payload).sort().join(',')==='message,remember,scope,session','time and receipt are presentation only, no history replay');
+ check(payload.message==='Second explicit question'&&!JSON.stringify(payload).includes('Literal'),'previous private messages not replayed by UI');
+ for(const mode of ['fail','malformed','timeout']){
+  const bad=fixture({chatMode:mode});await bad.open();await bad.submit('Failure fixture');
+  check(receipts(bad).at(-1).textContent==='Not confirmed',mode+' never falsely confirms');
+  check(bad.form().children[0].disabled===false,mode+' releases composer');
+  check(bad.state.calls.filter(c=>c.name==='chat').length===1,mode+' does not retry automatically');
+ }
+ const cancel=fixture({chatMode:'pending'});await cancel.open();const old=cancel.submit('Cancel fixture');while(!cancel.state.releaseChat)await pause();
+ await cancel.button('Stop request').click();check(receipts(cancel).at(-1).textContent==='Not confirmed','cancel is ambiguous, not false failure/delivery');
+ cancel.state.releaseChat();await old;check(!cancel.nodes().some(n=>n.textContent==='LATE_OLD_REPLY'),'late cancelled answer suppressed');
+ const identity=fixture({chatMode:'pending'});await identity.open();const stale=identity.submit('OLD_IDENTITY_CANARY');while(!identity.state.releaseChat)await pause();
+ identity.state.identity=true;identity.state.releaseChat();await stale;
+ check(!identity.nodes().some(n=>n.className==='message-delivery'||n.textContent==='OLD_IDENTITY_CANARY'),'identity transition clears old transcript and receipts');
+ check(identity.form().hidden,'identity mismatch requires fresh page');
+ const reveal=fixture({reduced:false,reply:'हिंदी 😀 answer '.repeat(100)});await reveal.open();const showing=reveal.submit('Reveal fixture');while(!reveal.button('Show full answer'))await pause();
+ check(receipts(reveal).at(-1).textContent==='Sent','local reveal does not delay accepted status');
+ await reveal.button('Show full answer').click();await showing;check(reveal.nodes().some(n=>n.attributes['aria-hidden']==='true'&&n.textContent===reveal.state.reply),'show-full preserves all Unicode characters');
+ check(!/read|delivered|online/i.test(receipts(reveal).map(n=>n.textContent).join(' ')),'no invented read/online claims');
+ const archiveFixture=require('./widget-archive.cjs').fixture;
+ const takeover=archiveFixture({archiveEnabled:true,reduced:false});await takeover.open();takeover.nodes().find(n=>n.className==='archive-permission').children[0].checked=true;
+ const interrupted=takeover.submit('Take over during local reveal');while(!takeover.nodes().some(n=>n.attributes['data-revealing']==='true'))await pause();
+ takeover.state.liveMode='human';takeover.state.liveGeneration=2;await takeover.state.poll();await interrupted;
+ check(!takeover.nodes().some(n=>n.attributes['data-chat-message']==='true'&&n.className==='bubble agent'),'takeover removes partially revealed answer without type error');
+ check(receipts(takeover).at(-1).textContent==='Not confirmed','interrupted turn does not claim completion after takeover');
+ const modelCalls=takeover.state.calls.filter(c=>c.name==='chat').length;await takeover.submit('Explicit human message');
+ check(receipts(takeover).at(-1).textContent==='Saved for support','human receipt confirms save only, not read');
+ check(takeover.state.calls.filter(c=>c.name==='chat').length===modelCalls,'human workflow never silently calls model');
+ takeover.state.humanSaveFail=true;await takeover.submit('Synthetic failed save');
+ check(receipts(takeover).at(-1).textContent==='Not confirmed','failed human save cannot claim delivered');
+ console.log('PASS: '+checks+' customer message status/literal rendering/failure/cancel/identity/reveal checks (synthetic transport only).');
+})().catch(e=>{console.error(e);process.exitCode=1;});

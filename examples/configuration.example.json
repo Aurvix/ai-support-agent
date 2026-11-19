@@ -1,0 +1,9 @@
+{
+  "provider": "gemini",
+  "model_choice": "__manual__",
+  "model": "YOUR_AVAILABLE_CHAT_COMPLETIONS_MODEL_ID",
+  "enabled": 0,
+  "memory": 0,
+  "mcp": 0,
+  "notes": "Illustrative UI values only; not an importer. Enter your API key privately in WordPress Providers, never in this file."
+}

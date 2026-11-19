@@ -1,0 +1,5 @@
+{
+  "wordpress": { "version": "7.1.4", "file": "wordpress-7.1.4-no-content.zip", "url": "https://downloads.wordpress.org/release/wordpress-7.1.4-no-content.zip", "sha256": "8747FC1DEA9D30684D22FA33004D1F61A503F0E843709378099852C1CC23B077" },
+  "woocommerce": { "version": "11.2.2", "file": "woocommerce.11.2.2.zip", "url": "https://downloads.wordpress.org/plugin/woocommerce.11.2.2.zip", "sha256": "A4746183EFD951DE5837396AAD119F7CF508F06CB699CCB590A01CADA4C44932" },
+  "sqlite": { "version": "3.1.3", "file": "sqlite-database-integration.3.1.3.zip", "url": "https://downloads.wordpress.org/plugin/sqlite-database-integration.3.1.3.zip", "sha256": "F6CE35E8419D0B9326221A907627D905E25C2A5BA2AFC86492811F14C851EFE0" }
+}

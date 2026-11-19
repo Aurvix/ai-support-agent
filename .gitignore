@@ -1,0 +1,11 @@
+node_modules/
+outputs/
+dist/
+tests/runtime-cache/
+tests/fixtures/legacy-0.1.7/dist/
+tests/fixtures/legacy-0.1.7/outputs/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store

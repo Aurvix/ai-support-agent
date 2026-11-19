@@ -1,0 +1,31 @@
+<?php
+// Recovery rehearsal only: disposable SQLite/WP/Woo, disabled-logins, no external transport.
+require __DIR__.'/wp-load.php';
+$checks=0;function brcheck($ok,$label){global $checks;$checks++;if(!$ok)throw new RuntimeException('Backup/restore: '.$label);}
+function brpm($name,...$args){return (new ReflectionMethod('AISA_Agent',$name))->invoke(null,...$args);}
+$phase=getenv('AISA_BACKUP_PHASE');
+if($phase==='seed'){
+ $s=AISA_Agent::defaults();$s['enabled']=1;$s['customer_tickets']=1;$s['public_sync']=1;$s['public_reference']=1;$s['public_sync_types']=array('page','product');update_option('aisa_settings',$s);AISA_Public_Sync::configure(AISA_Agent::defaults(),$s);
+ $page=wp_insert_post(array('post_type'=>'page','post_status'=>'publish','post_title'=>'Restore quartz public fact','post_content'=>'Synthetic restore reference only.'));
+ $kid=brpm('source_id',$page);brcheck($kid>0,'real source index exists');$approval=brpm('review_hash',get_post($kid));update_post_meta($kid,'aisa_approved_hash',$approval);
+ $held=wp_insert_post(array('post_type'=>'page','post_status'=>'publish','post_title'=>'Restore quartz excluded fact','post_content'=>'Excluded synthetic reference.'));update_post_meta($held,AISA_Public_Sync::HOLD,'1');
+ $import=wp_insert_post(array('post_type'=>'aisa_knowledge','post_status'=>'private','post_title'=>'Restore pending import','post_content'=>'Pending import must remain unapproved.'));
+ wp_set_current_user(2);$r=new WP_REST_Request('POST','/aisa/v1/tickets/submit');$r->set_body_params(array('scope'=>AISA_Memory::scope(),'topic'=>'catalog','confirm'=>true,'request_id'=>str_repeat('b',32)));$r->set_header('Content-Type','application/json');$r->set_body(wp_json_encode($r->get_body_params()));
+ $r->set_header('X-WP-Nonce',wp_create_nonce('wp_rest'));$server=rest_get_server();$response=$server->dispatch($r);brcheck($response->get_status()===200,'synthetic account ticket created');$ticket=$response->get_data()['ticket']['id'];
+ $upload=wp_upload_dir();$directory=$upload['basedir'].'/woocommerce_uploads';wp_mkdir_p($directory);file_put_contents($directory.'/restore-fixture.txt','Synthetic restore fixture only.');
+ $p=new WC_Product_Simple();$p->set_name('Synthetic restore download');$p->set_status('publish');$p->set_regular_price('7');$p->set_virtual(true);$p->set_downloadable(true);$p->set_download_limit(-1);$p->set_download_expiry(-1);$d=new WC_Product_Download();$d->set_id('restore-file');$d->set_name('Synthetic file');$d->set_file($directory.'/restore-fixture.txt');$p->set_downloads(array($d));$product=$p->save();
+ $o=wc_create_order(array('customer_id'=>2));$o->set_billing_email('fixture_a@example.test');$o->add_product($p,1);$o->calculate_totals();$o->set_status('completed');$o->save();
+ wc_downloadable_product_permissions($o->get_id());$permissions=WC_Data_Store::load('customer-download')->get_downloads(array('order_id'=>$o->get_id()));brcheck(count($permissions)===1,'real Woo permission created');
+ $upload=wp_upload_dir();wp_mkdir_p($upload['basedir']);file_put_contents($directory.'/restore-fixture.txt','Synthetic restore fixture only.');
+ $fixture=array('settings'=>$s,'page'=>$page,'knowledge'=>$kid,'approval'=>$approval,'held'=>$held,'import'=>$import,'ticket'=>$ticket,'product'=>$product,'order'=>$o->get_id(),'permission'=>(int)$permissions[0]->get_id(),'upload'=>$directory.'/restore-fixture.txt');update_option('aisa_restore_fixture',$fixture);
+ brcheck(!AISA_Public_Sync::approved(get_post(brpm('source_id',$held))),'held source excluded before backup');
+}elseif($phase==='mutate'){
+ $f=get_option('aisa_restore_fixture');brcheck(is_array($f),'seed state exists');$s=AISA_Agent::settings();$s['title']='Mutated settings';update_option('aisa_settings',$s);wp_delete_post($f['import'],true);delete_post_meta($f['knowledge'],'aisa_approved_hash');delete_post_meta($f['held'],AISA_Public_Sync::HOLD);wp_delete_post($f['ticket'],true);
+ $o=wc_get_order($f['order']);$o->update_status('pending');$permission=new WC_Customer_Download($f['permission']);$permission->set_downloads_remaining('0');$permission->save();file_put_contents($f['upload'],'Mutated file');brcheck(get_option('aisa_settings')['title']==='Mutated settings'&&!get_post($f['ticket']),'destructive synthetic mutation observed');
+}elseif($phase==='verify'){
+ $f=get_option('aisa_restore_fixture');brcheck(is_array($f),'fixture recovered');brcheck(AISA_Agent::settings()===$f['settings'],'settings recovered exactly');brcheck(get_post($f['import'])&&get_post_meta($f['import'],'aisa_approved_hash',true)==='','pending import restored without approval');brcheck(get_post_meta($f['knowledge'],'aisa_approved_hash',true)===$f['approval'],'source approval preserved');brcheck(get_post_meta($f['held'],AISA_Public_Sync::HOLD,true)==='1'&&!AISA_Public_Sync::approved(get_post(brpm('source_id',$f['held']))),'exclusion remains effective after restore');
+ brcheck(get_post($f['ticket'])!==null,'private ticket restored');$o=wc_get_order($f['order']);brcheck($o&&$o->get_customer_id()===2&&$o->get_status()==='completed','Woo order ownership and state recovered');$permission=new WC_Customer_Download($f['permission']);brcheck($permission->get_user_id()===2&&$permission->get_downloads_remaining()!=='0','download grant recovered');brcheck(file_get_contents($f['upload'])==='Synthetic restore fixture only.','upload content recovered');
+ wp_set_current_user(2);brcheck(count(AISA_Agent::orders()->get_data()['orders'])===1,'owner sees restored purchase');brcheck(count(AISA_Agent::downloads()->get_data()['downloads'])===1,'owner sees restored download');wp_set_current_user(3);brcheck(AISA_Agent::orders()->get_data()['orders']===array(),'other account sees no purchase');brcheck(AISA_Agent::downloads()->get_data()['downloads']===array(),'other account sees no download');
+ foreach(array(1,2,3)as$uid)brcheck(get_userdata($uid)->user_pass==='*'&&!WP_Session_Tokens::get_instance($uid)->get_all()&&!get_user_meta($uid,'_application_passwords',true),'no credentials or login sessions');brcheck(empty(AISA_Agent::settings()['mcp']),'MCP remains off');
+}else{throw new RuntimeException('Unknown recovery phase');}
+echo wp_json_encode(array('status'=>'PASS','phase'=>$phase,'checks'=>$checks,'version'=>AISA_VERSION));
